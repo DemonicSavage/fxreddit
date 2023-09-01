@@ -2,10 +2,6 @@ name = "vxreddit"
 main = "src/worker.ts"
 compatibility_date = "2023-08-14"
 
-routes = [
-	{ pattern = "***REMOVED***", custom_domain = true }
-]
-
 
 # node_compat = true
 
