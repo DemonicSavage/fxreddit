@@ -37,8 +37,8 @@ export async function postToHtml(post: RedditPost): Promise<HTMLElement> {
   head.meta("og:title", `r/${post.subreddit}: ${post.title}`);
   head.meta("twitter:title", post.title);
   head.meta("og:url", `https://www.reddit.com${post.permalink}`);
-  head.meta("og:site_name", "***REMOVED***");
-  head.meta("twitter:site", "***REMOVED***");
+  head.meta("og:site_name", DOMAIN_URL);
+  head.meta("twitter:site", DOMAIN_URL);
   head.meta("theme-color", "#ff581a");
 
   let descriptionText = post.description;

@@ -6,8 +6,6 @@ import { HTMLElement } from "node-html-parser";
 import { CACHE_CONFIG } from "./cache";
 
 const REDDIT_BASE_URL = "https://www.reddit.com";
-//const CUSTOM_DOMAIN = "rxddit.com";
-const CUSTOM_DOMAIN = "***REMOVED***";
 
 const FETCH_HEADERS = {
   "User-Agent":
@@ -55,8 +53,8 @@ function isBot({ headers }: IRequest): boolean {
 function getOriginalUrl(url: string) {
   const location = new URL(url);
 
-  if (location.hostname.endsWith(CUSTOM_DOMAIN)) {
-    location.hostname = location.hostname.replace(CUSTOM_DOMAIN, "reddit.com");
+  if (location.hostname.endsWith(DOMAIN_URL)) {
+    location.hostname = location.hostname.replace(DOMAIN_URL, "reddit.com");
   } else {
     location.hostname = "reddit.com";
   }
