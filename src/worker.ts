@@ -2,16 +2,8 @@ import { IRequest, Router, html as HtmlResponse } from "itty-router";
 import { postToHtml } from "./reddit/compile";
 import { parseRedditPost } from "./reddit/parse";
 import { RedditListingResponse, RedditPost } from "./reddit/types";
-import { Sentry } from "@borderless/worker-sentry";
 import { HTMLElement } from "node-html-parser";
 import { CACHE_CONFIG } from "./cache";
-
-const sentry = new Sentry({
-  dsn: "***REMOVED***",
-
-  // Performance Monitoring
-  // tracesSampleRate: 1.0, // Capture 100% of the transactions, reduce in production!
-});
 
 const REDDIT_BASE_URL = "https://www.reddit.com";
 //const CUSTOM_DOMAIN = "rxddit.com";
