@@ -6,6 +6,8 @@ import { HTMLElement } from "node-html-parser";
 import { CACHE_CONFIG } from "./cache";
 
 const REDDIT_BASE_URL = "https://www.reddit.com";
+const GITHUB_LINK = "https://github.com/DemonicSavage/fxreddit";
+
 
 const FETCH_HEADERS = {
   "User-Agent":
@@ -25,25 +27,63 @@ class ResponseError extends Error {
   }
 }
 
-async function get_post(
-  id: string,
-  subreddit?: string,
-  slug?: string
-): Promise<RedditPost> {
-  let url = REDDIT_BASE_URL;
-  if (subreddit && slug) {
-    url += `/r/${subreddit}/comments/${id}/${slug}.json`;
-  } else {
-    url += `/${id}.json`;
-  }
+function findComment(children: { data: RedditListingData }[], id: string): RedditListingData | null {
+    for (const { data } of children) {
+        if (!id || data.id == id) {
+            return data;
+        }
 
-  return await fetch(url, { headers: FETCH_HEADERS, ...CACHE_CONFIG })
-    .then((r) =>
-      r.ok
-        ? r.json<RedditListingResponse[]>()
-        : Promise.reject(new ResponseError(r.status, r.statusText))
-    )
-    .then(([json]) => parseRedditPost(json));
+        const comment = data.replies ? findComment(data.replies.data.children, id) : undefined;
+        if (comment) {
+            return comment;
+        }
+    }
+
+    return null;
+}
+
+async function get_post(url: string, commentRef?: string) {
+    return await fetch(url, { headers: FETCH_HEADERS, ...CACHE_CONFIG })
+        .then((r) => r.ok ? r.json<RedditListingResponse[]>() : Promise.reject(new ResponseError(r.status, r.statusText)))
+        .then(list => {
+            const post = parseRedditPost(list[0].data.children[0].data);
+            if (commentRef) {
+                for (const listing of list) {
+                    const comment = findComment(listing.data.children, commentRef);
+                    if (comment) {
+                        post.comment = parseRedditPost(comment);
+                        break;
+                    }
+                }
+            }
+
+            return post;
+        });
+}
+
+function get_post_url(type: string, id: string, subreddit?: string, slug?: string, commentRef?: string) {
+    let url = REDDIT_BASE_URL;
+    if (subreddit && slug && commentRef) {
+        url += `/${type}/${subreddit}/comments/${id}/${slug}/${commentRef}.json`;
+    } else if (subreddit && slug) {
+        url += `/${type}/${subreddit}/comments/${id}/${slug}.json`;
+    } else if (subreddit) {
+        url += `/${type}/${subreddit}/comments/${id}.json`;
+    } else {
+        url += `/${id}.json`;
+    }
+
+    return url;
+}
+
+async function get_subreddit_post(id: string, subreddit?: string, slug?: string, commentRef?: string): Promise<RedditPost> {
+    const url = get_post_url('r', id, subreddit, slug, commentRef);
+    return await get_post(url, commentRef);
+}
+
+async function get_profile_post(id: string, user?: string, slug?: string, commentRef?: string): Promise<RedditPost> {
+    const url = get_post_url('user', id, user, slug, commentRef);
+    return await get_post(url, commentRef);
 }
 
 function isBot({ headers }: IRequest): boolean {
@@ -65,95 +105,123 @@ function getOriginalUrl(url: string) {
   return location.toString();
 }
 
-function fallbackRedirect(req: IRequest) {
-  const url = getOriginalUrl(req.url);
+function redirectPage(url: string) {
+    const html = new HTMLElement('html', {});
+    html.appendChild(new HTMLElement('head', {}).appendChild(httpEquiv(url)));
+    return html;
+}
 
-  return HtmlResponse(
-    `<head><meta http-equiv="Refresh" content="0; URL=${url.replaceAll(
-      '"',
-      '\\"'
-    )}" /></head>`,
-    {
-      headers: { Location: url },
-      status: 302,
-    }
-  );
+function fallbackRedirect(req: IRequest) {
+    const url = getOriginalUrl(req.url);
+    const html = redirectPage(url);
+
+    return HtmlResponse(html.toString(), {
+        headers: { Location: url }, status: 302
+    });
 }
 
 const router = Router();
 
-async function handlePost(request: IRequest) {
-  const { params, url } = request;
-  const { name, id, slug } = params;
-  const originalLink = getOriginalUrl(url);
-  const bot = isBot(request);
+async function handlePost(request: IRequest, resolver: (id: string, name?: string, slug?: string, ref?: string) => Promise<RedditPost>) {
+    const { params, url } = request;
+    const { name, id, slug, ref } = params;
+    const originalLink = getOriginalUrl(url);
+    const bot = isBot(request);
 
-  const headers: HeadersInit = { ...RESPONSE_HEADERS };
-  const { protocol } = new URL(url);
-  if (protocol === "https:") {
-    headers["Strict-Transport-Security"] =
-      "max-age=31536000; includeSubDomains; preload";
-  }
+    const headers: HeadersInit = { ...RESPONSE_HEADERS };
+    const { protocol } = new URL(url);
+    if (protocol === 'https:') {
+        headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains; preload';
+    }
 
-  if (!bot) {
-    // forcing redirect for browsers
-    headers["Location"] = originalLink;
-  }
+    if (!bot) { // forcing redirect for browsers
+        headers['Location'] = originalLink;
+        return new Response(redirectPage(originalLink).toString(), { headers, status: 302 });
+    }
 
-  try {
-    const post = await get_post(id, name, slug);
-    const html = await postToHtml(post);
+    try {
+        const post = await resolver(id, name, slug, ref);
+        const html = await postToHtml(post);
 
-    html
-      .querySelector("head")
-      ?.appendChild(
-        new HTMLElement("meta", {})
-          .setAttribute("http-equiv", "Refresh")
-          .setAttribute("content", `0; URL=${originalLink}`)
-      );
+        html.querySelector('head')?.appendChild(httpEquiv(originalLink));
 
-    return new Response(html.toString(), {
-      headers,
-      status: bot ? 200 : 302,
-    });
-  } catch (err) {
-    const { status } = err as ResponseError;
-    if (status === 404) {
-      return new Response("Post not found", {
-        headers,
-        status,
-      });
-    } else {
-      throw err;
+        return new Response(html.toString(), {
+            headers,
+            status: 200
+        });
+    } catch (err) {
+        const { status } = err as ResponseError;
+        if (status === 404) {
+            return new Response('Post not found', {
+                headers,
+                status
+            });
+        } else {
+            throw err;
+        }
     }
   }
 }
 
-const ROBOTS_TXT = () =>
-  new Response("User-agent: *\nDisallow: /", {
-    headers: { "Content-Type": "text/plain" },
-  });
-const SECURITY_TXT = () =>
-  new Response(
-    "Contact: https://github.com/MinnDevelopment/fxreddit/issues/new",
-    { headers: { "Content-Type": "text/plain" } }
-  );
-const NOT_FOUND = () => new Response("Not Found", { status: 404 });
+/** Determines the original link by using the Location header */
+async function handleShare(request: IRequest) {
+    const url = new URL(request.url);
+    url.hostname = 'www.reddit.com';
+    url.port = '';
+    url.protocol = 'https:';
+
+    const response = await fetch(url.toString(), { headers: FETCH_HEADERS, ...CACHE_CONFIG, redirect: 'manual' });
+    const location = response.headers.get('Location');
+    if (location) {
+        const redirect = new URL(location);
+        redirect.hostname = new URL(request.url).hostname;
+        return new Response(redirectPage(redirect.toString()).toString(), {
+            headers: {
+                Location: redirect.toString(),
+                ...RESPONSE_HEADERS
+            }, status: 302
+        });
+    } else {
+        return new Response('Post not found', { status: 404 });
+    }
+}
+
+const ROBOTS_TXT = () => new Response('User-agent: *\nDisallow: /', { headers: { 'Content-Type': 'text/plain' } });
+const SECURITY_TXT = () => new Response('Contact: https://github.com/MinnDevelopment/fxreddit/issues/new', { headers: { 'Content-Type': 'text/plain' } });
+const NOT_FOUND = () => new Response('Not Found', { status: 404 });
+
+const handleSubredditPost = (req: IRequest) => handlePost(req, get_subreddit_post);
+const handleProfilePost = (req: IRequest) => handlePost(req, get_profile_post);
 
 router
-  // Redirect all browser usage
-  // .all('*', (req) => redirectBrowser(req))
-  // Block all robots / crawlers
-  .get("/robots.txt", ROBOTS_TXT)
-  .get("/security.txt", SECURITY_TXT)
-  .get("/*.ico", NOT_FOUND)
-  .get("/*.txt", NOT_FOUND)
-  .get("/*.xml", NOT_FOUND)
-  // Otherwise, if its a bot we respond with a meta tag page
-  .get("/r/:name/comments/:id/:slug?", handlePost)
-  .get("/:id", handlePost)
-  // On missing routes we simply redirect
-  .all("*", fallbackRedirect);
+    .get('/', () => HtmlResponse(redirectPage(GITHUB_LINK).toString(), { status: 302, headers: { Location: GITHUB_LINK } }))
+    // Block all robots / crawlers
+    .get('/robots.txt', ROBOTS_TXT)
+    .get('/security.txt', SECURITY_TXT)
+    .get('/blog', fallbackRedirect)
+    .get('/new', fallbackRedirect)
+    // Some static files we don't support
+    .get('/*.ico', NOT_FOUND)
+    .get('/*.png', NOT_FOUND)
+    .get('/*.jpg', NOT_FOUND)
+    .get('/*.jpeg', NOT_FOUND)
+    .get('/*.txt', NOT_FOUND)
+    .get('/*.xml', NOT_FOUND)
+    // Links to posts
+    .get('/r/:name/comments/:id/:slug?', handleSubredditPost)
+    .get('/:id', handleSubredditPost)
+    .get('/user/:name/comments/:id/:slug?', handleProfilePost)
+    .get('/u/:name/comments/:id/:slug?', handleProfilePost)
+    // Direct links to comments
+    .get('/r/:name/comments/:id/:slug/:ref', handleSubredditPost)
+    .get('/user/:name/comments/:id/:slug/:ref', handleProfilePost)
+    .get('/u/:name/comments/:id/:slug/:ref', handleProfilePost)
+    // Share links
+    .get('/r/:name/s/:id', handleShare)
+    .get('/u/:name/s/:id', handleShare)
+    .get('/user/:name/s/:id', handleShare)
+    // On missing routes we simply redirect
+    .all('*', fallbackRedirect);
 
 addEventListener("fetch", (event) => {
   event.respondWith(
