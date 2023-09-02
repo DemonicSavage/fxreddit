@@ -71,38 +71,10 @@ export async function postToHtml(post: RedditPost): Promise<HTMLElement> {
         head.meta("twitter:card", "summary_large_image");
         const amount = post.media_metadata.length;
 
-                if (amount > 1) {
-                    descriptionStatus.push(`🖼️ Gallery: ${post.media_metadata.length} Images`);
-                }
-
-                let index = 1;
-                for (const image of post.media_metadata) {
-                    head.image(image.url, image.width, image.height);
-                    if (image.caption?.length) {
-                        head.meta('twitter:image:alt', image.caption);
-                        head.meta('og:image:alt', image.caption);
-                    } else if (amount > 1) {
-                        head.meta('twitter:image:alt', `Image ${index} of ${amount}`);
-                        head.meta('og:image:alt', `Image ${index} of ${amount}`);
-                        index++;
-                    }
-                }
-            } else if (post.oembed) {
-                head.image(post.oembed.thumbnail_url);
-                descriptionText += post.oembed.title;
-            } else if (post.preview_image_url) {
-                head.image(post.preview_image_url, post.resolution?.width, post.resolution?.height);
-            } else if (post.url) {
-                const url = new URL(post.url);
-                if (url.pathname.endsWith('.png') || url.pathname.endsWith('.jpg') || url.pathname.endsWith('.gif')) {
-                    head.meta('twitter:card', 'summary_large_image');
-                    head.image(post.url);
-                } else if (url.pathname.endsWith('.mp4')) {
-                    head.video(post.url);
-                }
-            }
-
-            break;
+        if (amount > 1) {
+          descriptionStatus.push(
+            `🖼️ Gallery: ${post.media_metadata.length} Images`
+          );
         }
 
         let index = 1;
@@ -126,7 +98,7 @@ export async function postToHtml(post: RedditPost): Promise<HTMLElement> {
           post.resolution?.width,
           post.resolution?.height
         );
-      } else {
+      } else if (post.url) {
         const url = new URL(post.url);
         if (
           url.pathname.endsWith(".png") ||
@@ -146,17 +118,23 @@ export async function postToHtml(post: RedditPost): Promise<HTMLElement> {
 
   head.meta("og:type", type);
 
-    if (post.comment?.author) {
-        const { author, description: comment } = post.comment;
-        descriptionText += `\nComment by u/${author}${comment ? `:\n${comment}` : ''}`;
-    }
+  if (post.comment?.author) {
+    const { author, description: comment } = post.comment;
+    descriptionText += `\nComment by u/${author}${
+      comment ? `:\n${comment}` : ""
+    }`;
+  }
 
-    // Set the description based on the post content and status
-    const description = (descriptionStatus.join(' ') + '\n\n' + descriptionText).trim();
-    if (description.length) {
-        head.meta('og:description', description);
-        head.meta('twitter:description', description);
-    }
+  // Set the description based on the post content and status
+  const description = (
+    descriptionStatus.join(" ") +
+    "\n\n" +
+    descriptionText
+  ).trim();
+  if (description.length) {
+    head.meta("og:description", description);
+    head.meta("twitter:description", description);
+  }
 
   return html;
 }
