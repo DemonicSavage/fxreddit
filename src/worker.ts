@@ -1,9 +1,11 @@
-import { IRequest, Router, html as HtmlResponse } from "itty-router";
-import { postToHtml } from "./reddit/compile";
-import { parseRedditPost } from "./reddit/parse";
-import { RedditListingResponse, RedditPost } from "./reddit/types";
-import { HTMLElement } from "node-html-parser";
-import { CACHE_CONFIG } from "./cache";
+import { IRequest, Router, html as HtmlResponse } from 'itty-router';
+import { postToHtml } from './reddit/compile';
+import { parseRedditPost } from './reddit/parse';
+import { RedditListingData, RedditListingResponse, RedditPost } from './reddit/types';
+import { Sentry } from '@borderless/worker-sentry';
+import { HTMLElement } from 'node-html-parser';
+import { CACHE_CONFIG } from './cache';
+import { httpEquiv } from './html';
 
 const REDDIT_BASE_URL = "https://www.reddit.com";
 const GITHUB_LINK = "https://github.com/DemonicSavage/fxreddit";
