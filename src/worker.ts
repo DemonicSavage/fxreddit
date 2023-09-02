@@ -161,7 +161,6 @@ async function handlePost(request: IRequest, resolver: (id: string, name?: strin
         }
     }
   }
-}
 
 /** Determines the original link by using the Location header */
 async function handleShare(request: IRequest) {
