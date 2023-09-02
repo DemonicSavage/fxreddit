@@ -28,11 +28,15 @@ This has specialized handling for various types of reddit posts.
 
 The currently supported routes are:
 
-| Route                              | Example                                                                                                  |
-|------------------------------------|----------------------------------------------------------------------------------------------------------|
-| `/r/:subreddit/comments/:id/:slug` | https://rxddit.com/r/shittymoviedetails/comments/160onpq/breaking_actor_from_home_alone_2_arrested_today |
-| `/r/:subreddit/comments/:id`       | https://rxddit.com/r/shittymoviedetails/comments/160onpq                                                 |
-| `/:id`                             | https://rxddit.com/160onpq                                                                               |
+| Route                                       | Example                                                                                                          |
+|---------------------------------------------|------------------------------------------------------------------------------------------------------------------|
+| `/r/:subreddit/comments/:id/:slug/:comment` | https://rxddit.com/r/shittymoviedetails/comments/160onpq/breaking_actor_from_home_alone_2_arrested_today/jxnkq4g |
+| `/r/:subreddit/comments/:id/:slug`          | https://rxddit.com/r/shittymoviedetails/comments/160onpq/breaking_actor_from_home_alone_2_arrested_today         |
+| `/r/:subreddit/comments/:id`                | https://rxddit.com/r/shittymoviedetails/comments/160onpq                                                         |
+| `/r/:subreddit/s/:id`                       | https://rxddit.com/r/MemePiece/s/15w6vzg82W                                                                      |
+| `/:id`                                      | https://rxddit.com/160onpq                                                                                       |
+
+Or replacing `/r/` with `/u/` and `/user/` for profile posts.
 
 ### Image Posts
 
