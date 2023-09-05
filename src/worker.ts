@@ -231,10 +231,15 @@ addEventListener("fetch", (event) => {
       // Docs: https://developers.cloudflare.com/workers/runtime-apis/fetch-event#methods
       console.error(err);
 
-      // Respond to the original request while the error is being logged (above).
-      return new Response(err.message || "Internal Server Error", {
-        status: 500,
-      });
-    })
-  );
+        // Respond to the original request while the error is being logged (above).
+        const html = new HTMLElement('html', {});
+        const head = html.appendChild(new HTMLElement('head', {}));
+        head.appendChild(httpEquiv(getOriginalUrl(event.request.url)));
+        head.meta('og:description', `Failed to parse reddit post, please report bug!\n\n${GITHUB_LINK}/issues/new`);
+        head.meta('theme-color', '#e3242b');
+        const body = html.appendChild(new HTMLElement('body', {}));
+        body.appendChild(new HTMLElement('h1', {}, 'Internal Server Error'));
+        body.appendChild(new HTMLElement('p', {}, err.message));
+        return HtmlResponse(html.toString());
+    }));
 });
